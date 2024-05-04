@@ -17,6 +17,8 @@ local files = {
 
 for _, path in ipairs(files) do
 	if fs.exists(path) then
+		print(string.format('Removing old `%s`', path))
+		
 		fs.delete(path)
 	end
 	
