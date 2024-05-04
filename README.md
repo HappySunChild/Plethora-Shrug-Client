@@ -5,5 +5,5 @@
 - Chat Recorder
 - Overlay Glasses
 
-You can download this using
+You can download/update this by running<br/>
 `wget run https://raw.githubusercontent.com/HappySunChild/Plethora-Shrug-Client/main/download.lua`
