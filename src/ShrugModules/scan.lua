@@ -29,10 +29,14 @@ function scan.addWhitelist(canvas, name, alias, color)
 	local blockName = string.match(name, '[^<]+')
 	local tagName, tagValue = string.match(name, '<([^=]+)=(.-)>')
 	
-	local tagData = {
-		Name = tagName,
-		Value = tagValue
-	}
+	local tagData = nil
+	
+	if tagName and tagValue then
+		tagData = {
+			Name = tagName,
+			Value = tagValue
+		}
+	end
 	
 	local blockAlias = alias or blockName
 	local blockColor = tonumber(tostring(color), 16) or 0xFF0000FF
@@ -86,14 +90,18 @@ end
 
 ---@param blockData BlockScanner.BlockData
 ---@return boolean whitelisted
----@return WhitelistData?
+---@return WhitelistData? data
 ---@return integer? index
 function scan.isWhitelisted(blockData)
 	for index, whitelistData in ipairs(scan.BlockWhitelist) do
 		if whitelistData.BlockName == blockData.name then
 			local tagData = whitelistData.Tag
 			
-			if blockData.state[tagData.Name] == tagData.Value then
+			if tagData then
+				if tostring(blockData.state[tagData.Name]):lower() == tagData.Value:lower() then
+					return true, whitelistData, index
+				end
+			else
 				return true, whitelistData, index
 			end
 		end
