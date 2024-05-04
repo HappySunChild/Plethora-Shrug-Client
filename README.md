@@ -6,4 +6,4 @@
 - Overlay Glasses
 
 You can download/update this by running<br/>
-`wget run https://raw.githubusercontent.com/HappySunChild/Plethora-Shrug-Client/main/download.lua`
+`wget run https://raw.githubusercontent.com/HappySunChild/Plethora-Shrug-Client/main/downloader.lua`
