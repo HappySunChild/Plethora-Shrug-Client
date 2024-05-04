@@ -1,12 +1,17 @@
 local scan = {}
 scan.Modules = nil ---@type Shrug.NeuralInterface
 scan.Enabled = false
-scan.Tracers = true
-
 scan.LastScan = 0
-scan.ScanTime = 0.1
-scan.BoxAlpha = 100
-scan.TracerAlpha = 100
+
+scan.SettingsName = 'ScannerSettings'
+scan.Settings = {
+	DrawTracers = true,
+	
+	ScanInterval = 0.1,
+	
+	BoxAlpha = 100,
+	TracerAlpha = 100
+}
 
 scan.BlockWhitelist = {} ---@type WhitelistData[]
 
@@ -111,7 +116,7 @@ function scan.isWhitelisted(blockData)
 end
 
 function scan.canScan()
-	return (os.clock() - scan.LastScan) >= scan.ScanTime
+	return (os.clock() - scan.LastScan) >= scan.Settings.ScanInterval
 end
 
 function scan.resetCounts()

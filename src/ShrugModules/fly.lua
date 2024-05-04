@@ -1,10 +1,14 @@
 local fly = {}
 fly.Modules = nil ---@type Shrug.NeuralInterface
 fly.Enabled = false
-fly.RequiresTool = true
-fly.Power = 1
-fly.Tools = {
-	['plethora:neuralconnector'] = true
+
+fly.SettingsName = 'FlightSettings'
+fly.Settings = {
+	RequiresTool = true,
+	Power = 1,
+	Tools = {
+		['plethora:neuralconnector'] = true
+	}
 }
 
 ---Returns a list of currently active fly tools.
@@ -12,7 +16,7 @@ fly.Tools = {
 function fly.getTools()
 	local tools = {}
 	
-	for tool, _ in pairs(fly.Tools) do
+	for tool, _ in pairs(fly.Settings.Tools) do
 		table.insert(tools, tool)
 	end
 	
@@ -22,11 +26,11 @@ end
 ---Adds a tool to the list of tools used to fly.
 ---@param toolName string
 function fly.addTool(toolName)
-	if fly.Tools[toolName] then
+	if fly.Settings.Tools[toolName] then
 		return string.format('Fly tool `%s` already exists.', toolName)
 	end
 	
-	fly.Tools[toolName] = true
+	fly.Settings.Tools[toolName] = true
 	
 	return string.format('Successfully added fly tool `%s`.', toolName)
 end
@@ -34,18 +38,18 @@ end
 ---Removes a tool from the list of tools used to fly.
 ---@param toolName string
 function fly.removeTool(toolName)
-	if not fly.Tools[toolName] then
+	if not fly.Settings.Tools[toolName] then
 		return string.format('`%s` not found.', toolName)
 	end
 	
-	fly.Tools[toolName] = nil
+	fly.Settings.Tools[toolName] = nil
 	
 	return string.format('Successfully removed fly tool `%s`.', toolName)
 end
 
 ---Clears the list of tools used to fly.
 function fly.clearTools()
-	fly.Tools = {
+	fly.Settings.Tools = {
 		['plethora:neuralconnector'] = true
 	}
 end
@@ -54,7 +58,7 @@ end
 ---@param toolName string
 ---@return boolean isTool
 function fly.isTool(toolName)
-	return fly.Tools[toolName] ~= nil
+	return fly.Settings.Tools[toolName] ~= nil
 end
 
 return fly

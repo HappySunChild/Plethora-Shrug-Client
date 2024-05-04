@@ -1,5 +1,6 @@
 local button = require('ShrugModules.button')
 local bounding = require('ShrugModules.bounding')
+
 local scan = require('ShrugModules.scan')
 local fly = require('ShrugModules.fly')
 
@@ -11,11 +12,17 @@ modules.canvas().clear()
 local canvas = modules.canvas()
 local canvas3d = modules.canvas3d().create()
 
-term.clear()
-term.setCursorPos(1, 1)
+local SETTINGS_PATH = '.shrug_settings'
 
 local PLAYER_METADATA = nil --- @type EntitySensor.EntityMetadata
 local PLAYER_ID = nil
+
+local function saveSettings()
+	settings.set(scan.SettingsName, scan.Settings)
+	settings.set(fly.SettingsName, fly.Settings)
+	
+	settings.save(SETTINGS_PATH)
+end
 
 ---@type table<string, table<string, Shrug.Command>>
 local CHAT_COMMANDS = {
@@ -75,25 +82,25 @@ local CHAT_COMMANDS = {
 				local alpha = tonumber(alpha) or 100
 				
 				if mode == 'tracers' then
-					scan.TracerAlpha = alpha
+					scan.Settings.TracerAlpha = alpha
 				elseif mode == 'boxes' then
-					scan.BoxAlpha = alpha
+					scan.Settings.BoxAlpha = alpha
 				else
 					return 'Invalid tracer type.'
 				end
 				
-				return string.format('Successfully set `%s` alpha to %d.', mode, alpha)
+				return string.format('`%s` alpha is now %d.', mode, alpha)
 			end
 		},
-		settimer = {
+		setinterval = {
 			DisplayOrder = 7,
-			Arguments = '<time>',
-			Callback = function (time)
-				local time = tonumber(time) or 0.2
+			Arguments = '<interval>',
+			Callback = function (interval)
+				local time = tonumber(interval) or 0.2
 				
-				scan.ScanTime = time
+				scan.Settings.ScanInterval = time
 				
-				return string.format('Successfully set scan timer to %.2f.', time)
+				return string.format('Scan interval is now %.2f.', time)
 			end
 		}
 	},
@@ -114,16 +121,16 @@ local CHAT_COMMANDS = {
 				power = tonumber(power)
 				
 				if not power then
-					return string.format('Current fly power is %.2f', fly.Power)
+					return string.format('Current fly power is %.2f', fly.Settings.Power)
 				end
 				
 				if power < 0 or power > 4 then
 					return string.format('Inputted power `%.2f` is out of range! (0-4)', power)
 				end
 				
-				fly.Power = power
+				fly.Settings.Power = power
 				
-				return string.format('Successfully set fly power to %.2f', power)
+				return string.format('Fly power is now %.2f', power)
 			end
 		},
 		list = {
@@ -178,6 +185,26 @@ local CHAT_COMMANDS = {
 				fly.clearTools()
 				
 				return 'Cleared tools.'
+			end
+		},
+		toggletool = {
+			DisplayOrder = 9,
+			Arguments = '',
+			Callback = function ()
+				fly.Settings.RequiresTool = not fly.Settings.RequiresTool
+				
+				return fly.Settings.RequiresTool and 'Tools are now required to fly.' or 'Tools are no longer required to fly.'
+			end
+		}
+	},
+	settings = {
+		save = {
+			Arguments = '',
+			DisplayOrder = 1,
+			Callback = function ()
+				saveSettings()
+				
+				return 'Successfully saved settings.'
 			end
 		}
 	}
@@ -253,6 +280,20 @@ local function setup()
 			end
 		}
 	end
+	
+	term.clear()
+	term.setCursorPos(1, 1)
+	
+	local success = settings.load(SETTINGS_PATH)
+	
+	if not success then
+		modules.tell(string.format('Creating save file at `%s`.', SETTINGS_PATH))
+		
+		saveSettings()
+	else
+		scan.Settings = settings.get(scan.SettingsName, scan.Settings)
+		fly.Settings = settings.get(fly.SettingsName, fly.Settings)
+	end
 end
 
 -------------------------------------
@@ -277,10 +318,10 @@ local function eventHandler()
 			local handlerName = messageArgs[1]:sub(2)
 			local commandName = messageArgs[2] or 'help'
 			
-			local output = nil
 			local handler = CHAT_COMMANDS[handlerName]
 			
 			if handler then
+				local output = nil
 				local command = handler[commandName]
 					
 				if command then
@@ -292,17 +333,19 @@ local function eventHandler()
 				else
 					output = {string.format('Invalid command `%s`', commandName)}
 				end
-			end
-			
-			if output then
-				for _, text in ipairs(output) do
-					modules.tell(text)
+				
+				if output then
+					for _, text in ipairs(output) do
+						modules.tell(text)
+					end
 				end
 			end
 		elseif event == 'terminate' then
 			modules.clearCaptures()
 			canvas.clear()
 			canvas3d.clear()
+			
+			saveSettings()
 			
 			modules.tell('Terminating...')
 			
@@ -322,10 +365,23 @@ local function main()
 	
 	while true do
 		local heldItem = PLAYER_METADATA.heldItem
+		local offhandItem = PLAYER_METADATA.offhandItem
 		
-		if fly.Enabled and PLAYER_METADATA.isSneaking and heldItem then
-			if fly.isTool(heldItem.getMetadata().name) or not fly.RequiresTool then
-				modules.launch(PLAYER_METADATA.yaw, PLAYER_METADATA.pitch, fly.Power)
+		if fly.Enabled and PLAYER_METADATA.isSneaking then
+			local hasTool = false
+			
+			if fly.Settings.RequiresTool then
+				if heldItem then
+					hasTool = fly.isTool(heldItem.getMetadata().name) or hasTool
+				end
+				
+				if offhandItem then
+					hasTool = fly.isTool(offhandItem.getMetadata().name) or hasTool
+				end
+			end
+			
+			if hasTool or not fly.Settings.RequiresTool then
+				modules.launch(PLAYER_METADATA.yaw, PLAYER_METADATA.pitch, fly.Settings.Power)
 			end
 		end
 		
@@ -371,17 +427,17 @@ local function main()
 				
 				local box = canvas3d.addBox(position.x, position.y, position.z, data.SizeX, data.SizeY, data.SizeZ, data.Color)
 				box.setDepthTested(false)
-				box.setAlpha(scan.BoxAlpha)
+				box.setAlpha(scan.Settings.BoxAlpha)
 				
 				local frame = canvas3d.addFrame(center)
 				frame.setDepthTested(false)
 				frame.setRotation()
 				frame.addText({x=0, y=0}, string.format('%s\n(%d)', data.Alias, data.Count), nil, 1.5)
 				
-				if scan.Tracers then
+				if scan.Settings.DrawTracers then
 					local line = canvas3d.addLine({x = 0, y = -1, z = 0}, center, 2, data.Color)
 					line.setDepthTested(false)
-					line.setAlpha(scan.TracerAlpha)
+					line.setAlpha(scan.Settings.TracerAlpha)
 				end
 			end
 			
