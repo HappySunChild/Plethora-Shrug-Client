@@ -1,1 +1,2 @@
-Download using: `wget run https://raw.githubusercontent.com/HappySunChild/Plethora-Shrug-Client/main/download.lua`
+Download using:<br/>
+`wget run https://raw.githubusercontent.com/HappySunChild/Plethora-Shrug-Client/main/download.lua`
