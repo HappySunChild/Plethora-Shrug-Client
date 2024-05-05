@@ -9,8 +9,11 @@ end
 local baseLink = 'https://raw.githubusercontent.com/HappySunChild/Plethora-Shrug-Client/main/src/%s'
 local files = {
 	'startup.lua',
+	
+	'ShrugModules/usersettings.lua',
 	'ShrugModules/bounding.lua',
-	'ShrugModules/button.lua',
+	
+	'ShrugModules/client.lua',
 	'ShrugModules/scan.lua',
 	'ShrugModules/fly.lua',
 }
