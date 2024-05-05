@@ -16,6 +16,29 @@ local SCANNER_CANVAS = modules.canvas3d().create()
 local PLAYER_METADATA = nil --- @type EntitySensor.EntityMetadata
 local PLAYER_ID = nil
 
+---@param offhand? boolean
+---@return boolean exists
+---@return Inventory.ItemMetadata? metadata
+local function getItemMetadata(offhand)
+	local metadata = nil
+	
+	if client.SERVER_ID then
+		if offhand and PLAYER_METADATA.offhandItem then
+			metadata = PLAYER_METADATA.offhandItem.metadata
+		elseif not offhand and PLAYER_METADATA.heldItem then
+			metadata = PLAYER_METADATA.heldItem.metadata
+		end
+	else
+		if offhand and PLAYER_METADATA.offhandItem then
+			metadata = PLAYER_METADATA.offhandItem.getMetadata()
+		elseif not offhand and PLAYER_METADATA.heldItem then
+			metadata = PLAYER_METADATA.heldItem.getMetadata()
+		end
+	end
+	
+	return metadata ~= nil, metadata
+end
+
 ---@type table<string, table<string, Shrug.Command>>
 local CHAT_COMMANDS = {
 	scan = {
@@ -144,10 +167,10 @@ local CHAT_COMMANDS = {
 			Arguments = '[item name]',
 			Callback = function (tool)
 				if not tool then
-					local heldItem = PLAYER_METADATA.heldItem
+					local exists, meta = getItemMetadata()
 					
-					if heldItem then
-						tool = heldItem.getMetadata().name
+					if exists and meta then
+						tool = meta.name
 					end
 				end
 				
@@ -163,10 +186,10 @@ local CHAT_COMMANDS = {
 			Arguments = '[item name]',
 			Callback = function (tool)
 				if not tool then
-					local heldItem = PLAYER_METADATA.heldItem
+					local exists, meta = getItemMetadata()
 					
-					if heldItem then
-						tool = heldItem.getMetadata().name
+					if exists and meta then
+						tool = meta.name
 					end
 				end
 				
@@ -194,6 +217,17 @@ local CHAT_COMMANDS = {
 				usersettings.set('RequiresTool', newValue)
 				
 				return newValue and 'Tools are now required to fly.' or 'Tools are no longer required to fly.'
+			end
+		}
+	},
+	remote = {
+		drop = {
+			Arguments = '',
+			DisplayOrder = 1,
+			Callback = function ()
+				modules.tell('Requesting drop...')
+				
+				client.invoke('Drop')
 			end
 		}
 	},
@@ -361,11 +395,19 @@ local function main()
 			
 			if requiresTool then
 				if heldItem then
-					hasTool = fly.isTool(heldItem.getMetadata().name) or hasTool
+					local exists, meta = getItemMetadata()
+					
+					if exists and meta then
+						hasTool = fly.isTool(meta.name) or hasTool
+					end
 				end
 				
 				if offhandItem then
-					hasTool = fly.isTool(offhandItem.getMetadata().name) or hasTool
+					local exists, meta = getItemMetadata(true)
+					
+					if exists and meta then
+						hasTool = fly.isTool(meta.name) or hasTool
+					end
 				end
 			end
 			

@@ -9,14 +9,23 @@ local client = {}
 client.SERVER_PROTOCOL = 'SHRUG_SERVER'
 client.SERVER_ID = nil
 
-local function receive(timeout)
+client.LastMetadataPing = -1
+
+---@param taskid number
+---@param timeout? number
+---@return ServerResponse
+local function receive(taskid, timeout)
+	---@type integer?, ServerResponse?
 	local id, content = rednet.receive('SERVER_RESPONSE', timeout)
 	
-	if id ~= client.SERVER_ID and id ~= nil then -- ignore other computers
-		return receive(timeout)
+	if id ~= client.SERVER_ID and id ~= nil and content and content.TaskID == taskid then -- ignore other computers
+		return receive(taskid, timeout)
 	end
 	
-	return content
+	return content or {
+		Success = false,
+		Message = 'Timed out.'
+	}
 end
 
 local function getServer(isRetry)
@@ -34,34 +43,46 @@ local function getServer(isRetry)
 		return id
 	end
 	
-	print('Invalid host name!')
+	print('No response from host name.')
 	
 	return getServer(true)
 end
 
-function client.invoke(protocol, data)
-	rednet.send(client.SERVER_ID, data, protocol)
+---@param data any
+---@return ClientRequest
+local function encode(data, id)
+	local encoded = {
+		TaskID = id,
+		Token = usersettings.get('Token'),
+		Body = data,
+	}
 	
-	return receive(8)
+	return encoded
+end
+
+function client.invoke(protocol, data)
+	local taskId = math.random(0, 9e6)
+	
+	rednet.send(client.SERVER_ID, encode(data, taskId), protocol)
+	
+	return receive(taskId, 8)
 end
 
 function client.isTokenValid()
-	local responseData = client.invoke('VerifyToken', {
-		Token = usersettings.Settings.Client.Token
-	})
+	local responseData = client.invoke('VerifyToken')
 	
 	return responseData.IsValid
 end
 
 function client.login(isRetry)
-	if usersettings.Settings.Client.Username == nil or isRetry then
+	if usersettings.get('Username') == nil or isRetry then
 		write('Enter Username: ')
 		
-		usersettings.Settings.Client.Username = read()
+		usersettings.set('Username', read())
 	end
 	
 	local loginData = {
-		Username = usersettings.Settings.Client.Username
+		Username = usersettings.get('Username')
 	}
 	
 	local response = client.invoke('Login', loginData)
@@ -73,9 +94,11 @@ function client.login(isRetry)
 			return client.login(true)
 		end
 		
-		print(string.format('\nLogin success!\nToken: %d', response.Token))
+		local token = response.Body.Token
 		
-		usersettings.Settings.Client.Token = response.Token
+		print(string.format('\nLogin success!\nToken: %d', token))
+		
+		usersettings.set('Token', token)
 	else
 		printError('Timed out.')
 		
@@ -83,13 +106,32 @@ function client.login(isRetry)
 	end
 end
 
----@return EntitySensor.EntityMetadata
+---@return EntitySensor.EntityMetadata?
 function client.getMetadata()
-	local token = usersettings.Settings.Client.Token
+	if (os.clock() - client.LastMetadataPing) <= 0.2 then
+		return
+	end
 	
-	return client.invoke('GetMetadata', {
-		Token = token
-	})
+	client.LastMetadataPing = os.clock()
+	
+	local response = client.invoke('GetMetadata')
+	
+	if response.Success then
+		return response.Body.Metadata
+	end
+	
+	printError(response.Message)
+end
+
+---@return table<number, Inventory.ItemMetadata>?
+function client.getInventory()
+	local response = client.invoke('GetInventory')
+	
+	if response.Success then
+		return response.Body.Inventory
+	end
+	
+	printError(response.Message)
 end
 
 function client.setup()
@@ -101,12 +143,6 @@ function client.setup()
 	
 	if not hasModem then
 		return
-	end
-	
-	if usersettings.Settings.Client.HostName == nil then
-		write('Host Name: ')
-		
-		usersettings.Settings.Client.HostName = read()
 	end
 	
 	client.SERVER_ID = getServer()

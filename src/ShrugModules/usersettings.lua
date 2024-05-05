@@ -32,9 +32,6 @@ end
 function usersettings.load()
 	settings.load(usersettings.SAVE_PATH)
 	usersettings.Settings = settings.get('ShrugSettings', usersettings.Settings)
-	
-	usersettings.get('Token')
-	usersettings.set('Power', 5)
 end
 
 function usersettings.get(settingName)
