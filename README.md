@@ -9,5 +9,6 @@ You can download/update this by running<br/>
 - Entity Sensor/Shrug Proxy Server
 
 ### Shrug Proxy Server
-This is an optional thing you can set up to free up one module slot and also adds some more commands (.remote).<br/>
-...
+This is an optional thing you can set up to free up one module slot and also adds some more commands.<br/>
+Server can be set up on a seperate computer and running<br/>
+`wget get https://raw.githubusercontent.com/HappySunChild/Plethora-Shrug-Client/main/src/server.lua startup.lua`
