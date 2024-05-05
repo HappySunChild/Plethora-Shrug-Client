@@ -11,4 +11,4 @@ You can download/update this by running<br/>
 ### Shrug Proxy Server
 This is an optional thing you can set up to free up one module slot and also adds some more commands.<br/>
 Server can be set up on a seperate computer and running<br/>
-`wget get https://raw.githubusercontent.com/HappySunChild/Plethora-Shrug-Client/main/src/server.lua startup.lua`
+`wget https://raw.githubusercontent.com/HappySunChild/Plethora-Shrug-Client/main/src/server.lua startup.lua`
