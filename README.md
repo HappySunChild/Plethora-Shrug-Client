@@ -6,10 +6,10 @@ You can download/update this by running<br/>
 - Kinetic Augment
 - Chat Recorder
 - Overlay Glasses
-- Entity Sensor/Shrug Proxy Server
+- Entity Sensor
 
 ### Shrug Proxy Server
-This is an optional thing you can set up to free up one module slot and also adds some more commands.<br/>
+A Shrug Proxy Server can be set up to allow for remote commands.<br/>
 
 Server startup file download command:<br/>
 `wget https://raw.githubusercontent.com/HappySunChild/Plethora-Shrug-Client/main/src/server.lua startup.lua`
