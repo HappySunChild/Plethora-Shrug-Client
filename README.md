@@ -9,7 +9,7 @@ You can download/update this by running<br/>
 - Entity Sensor
 
 ### Shrug Proxy Server
-A Shrug Proxy Server can be set up to allow for remote commands.<br/>
+A Shrug Proxy Server can be set up to allow for remote commands to extra modules.<br/>
 
 Server startup file download command:<br/>
 `wget https://raw.githubusercontent.com/HappySunChild/Plethora-Shrug-Client/main/src/server.lua startup.lua`
