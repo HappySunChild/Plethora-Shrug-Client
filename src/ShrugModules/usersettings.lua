@@ -2,26 +2,31 @@ local usersettings = {}
 usersettings.SAVE_PATH = '.shrugsettings'
 usersettings.Settings = {}
 
-local function recurse(tbl, callback)
-	local var = nil
+local function split(base, seperator)
+	local tbl = {}
 	
-	for index, value in pairs(tbl) do
-		var = callback(tbl, index, value)
-		
-		if var then
-			return var
-		end
-		
-		if type(value) == 'table' then
-			var = recurse(value, callback)
-		end
-		
-		if var then
-			return var
-		end
+	for str in string.gmatch(base, ('[^%s]+'):format(seperator)) do
+		table.insert(tbl, str)
 	end
 	
-	return var
+	return tbl
+end
+
+local function parsePath(path)
+	local dirs = split(path, '/')
+	
+	local current = usersettings.Settings
+	local target = table.remove(dirs, #dirs)
+	
+	for _, dirName in ipairs(dirs) do
+		if not current[dirName] then
+			current[dirName] = {}
+		end
+		
+		current = current[dirName]
+	end
+	
+	return current, target
 end
 
 function usersettings.save()
@@ -30,26 +35,27 @@ function usersettings.save()
 end
 
 function usersettings.load()
-	settings.load(usersettings.SAVE_PATH)
-	usersettings.Settings = settings.get('ShrugSettings', usersettings.Settings)
+	local exists = settings.load(usersettings.SAVE_PATH)
+	
+	if exists then
+		usersettings.Settings = settings.get('ShrugSettings', usersettings.Settings)
+	end
 end
 
-function usersettings.get(settingName)
-	return recurse(usersettings.Settings, function (_, index, value)
-		if index == settingName then
-			return value
-		end
-	end)
+function usersettings.path(...)
+	return table.concat({...}, '/')
 end
 
-function usersettings.set(settingName, value)
-	return recurse(usersettings.Settings, function (tbl, index)
-		if index == settingName then
-			tbl[index] = value
-			
-			return true
-		end
-	end)
+function usersettings.get(settingPath)
+	local current, index = parsePath(settingPath)
+	
+	return current[index]
+end
+
+function usersettings.set(settingPath, value)
+	local current, index = parsePath(settingPath)
+	
+	current[index] = value
 end
 
 return usersettings

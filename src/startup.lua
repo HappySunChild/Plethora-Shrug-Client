@@ -56,8 +56,12 @@ local CHAT_COMMANDS = {
 		},
 		list = {
 			DisplayOrder = 2,
-			Arguments = '',
-			Callback = function ()
+			Arguments = '[saved]',
+			Callback = function (saved)
+				if saved == 'saved' then
+					return 'saved'
+				end
+				
 				local output = 'Current blocks:\n'
 				local whitelist = scan.getWhitelist()
 				
@@ -74,18 +78,45 @@ local CHAT_COMMANDS = {
 			DisplayOrder = 3,
 			Arguments = '<block name> [alias] [color hex]',
 			Callback = function (name, alias, color)
-				return scan.addWhitelist(CANVAS, name, alias, color)
+				return scan.whitelistBlock(CANVAS, name, alias, color)
 			end
 		},
 		remove = {
 			DisplayOrder = 4,
 			Arguments = '<block name>',
 			Callback = function (name)
-				return scan.removeWhitelist(name)
+				return scan.unwhitelistBlock(name)
+			end
+		},
+		saves = {
+			DisplayOrder = 5,
+			Arguments = '<action> <name>',
+			Callback = function (action, whitelistName)
+				if action == 'save' then
+					return scan.saveWhitelist(whitelistName)
+				elseif action == 'load' then
+					return scan.loadWhitelist(CANVAS, whitelistName)
+				elseif action == 'remove' then
+					return scan.removeWhitelist(whitelistName)
+				elseif action == 'list' or action == nil then
+					local list = {}
+					
+					for name, whitelist in pairs(usersettings.get('Scan/SavedWhitelists')) do
+						local count = 0
+						
+						for _, _ in pairs(whitelist) do
+							count = count + 1
+						end
+						
+						table.insert(list, ('%s (%d entries)'):format(name, count))
+					end
+					
+					return ('Saved whitelists:\n%s'):format(table.concat(list, '\n'))
+				end
 			end
 		},
 		clear = {
-			DisplayOrder = 5,
+			DisplayOrder = 10,
 			Arguments = '',
 			Callback = function ()
 				scan.clearWhitelist()
@@ -94,17 +125,15 @@ local CHAT_COMMANDS = {
 			end
 		},
 		setalpha = {
-			DisplayOrder = 6,
+			DisplayOrder = 20,
 			Arguments = '<tracers|boxes> <alpha>',
 			Callback = function (mode, alpha)
 				local alpha = tonumber(alpha) or 100
 				
 				if mode == 'tracers' then
-					usersettings.set('TracerAlpha', alpha)
-					--scan.Settings.TracerAlpha = alpha
+					usersettings.set('Scan/TracerAlpha', alpha)
 				elseif mode == 'boxes' then
-					usersettings.set('BoxAlpha', alpha)
-					--scan.Settings.BoxAlpha = alpha
+					usersettings.set('Scan/BoxAlpha', alpha)
 				else
 					return 'Invalid tracer type.'
 				end
@@ -113,13 +142,12 @@ local CHAT_COMMANDS = {
 			end
 		},
 		setinterval = {
-			DisplayOrder = 7,
+			DisplayOrder = 21,
 			Arguments = '<interval>',
 			Callback = function (interval)
 				local time = tonumber(interval) or 0.2
 				
-				--scan.Settings.ScanInterval = time
-				usersettings.set('ScanInterval', time)
+				usersettings.set('Scan/ScanInterval', time)
 				
 				return string.format('Scan interval is now %.2f.', time)
 			end
@@ -142,7 +170,7 @@ local CHAT_COMMANDS = {
 				power = tonumber(power)
 				
 				if not power then
-					return string.format('Current fly power is %.2f', usersettings.get('Power'))
+					return string.format('Current fly power is %.2f', usersettings.get('Fly/Power'))
 				end
 				
 				if power < 0 or power > 4 then
@@ -150,7 +178,7 @@ local CHAT_COMMANDS = {
 				end
 				
 				--fly.Settings.Power = power
-				usersettings.set('Power', power)
+				usersettings.set('Fly/Power', power)
 				
 				return string.format('Fly power is now %.2f', power)
 			end
@@ -213,8 +241,8 @@ local CHAT_COMMANDS = {
 			DisplayOrder = 9,
 			Arguments = '',
 			Callback = function ()
-				local newValue = not usersettings.get('RequiresTool')
-				usersettings.set('RequiresTool', newValue)
+				local newValue = not usersettings.get('Fly/RequiresTool')
+				usersettings.set('Fly/RequiresTool', newValue)
 				
 				return newValue and 'Tools are now required to fly.' or 'Tools are no longer required to fly.'
 			end
@@ -391,7 +419,7 @@ local function main()
 		
 		if fly.Enabled and PLAYER_METADATA.isSneaking then
 			local hasTool = false
-			local requiresTool = usersettings.get('RequiresTool')
+			local requiresTool = usersettings.get('Fly/RequiresTool')
 			
 			if requiresTool then
 				if heldItem then
@@ -412,7 +440,7 @@ local function main()
 			end
 			
 			if hasTool or not requiresTool then
-				modules.launch(PLAYER_METADATA.yaw, PLAYER_METADATA.pitch, usersettings.get('Power'))
+				modules.launch(PLAYER_METADATA.yaw, PLAYER_METADATA.pitch, usersettings.get('Fly/Power'))
 			end
 		end
 		
@@ -458,17 +486,17 @@ local function main()
 				
 				local box = SCANNER_CANVAS.addBox(position.x, position.y, position.z, data.SizeX, data.SizeY, data.SizeZ, data.Color)
 				box.setDepthTested(false)
-				box.setAlpha(usersettings.get('BoxAlpha'))
+				box.setAlpha(usersettings.get('Scan/BoxAlpha'))
 				
 				local frame = SCANNER_CANVAS.addFrame(center)
 				frame.setDepthTested(false)
 				frame.setRotation()
 				frame.addText({x=0, y=0}, string.format('%s\n(%d)', data.Alias, data.Count), nil, 1.6)
 				
-				if usersettings.get('DrawTracers') then
+				if usersettings.get('Scan/DrawTracers') then
 					local line = SCANNER_CANVAS.addLine({x = 0, y = -1, z = 0}, center, 2, data.Color)
 					line.setDepthTested(false)
-					line.setAlpha(usersettings.get('TracerAlpha'))
+					line.setAlpha(usersettings.get('Scan/TracerAlpha'))
 				end
 			end
 			

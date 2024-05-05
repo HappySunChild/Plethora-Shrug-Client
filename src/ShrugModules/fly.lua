@@ -1,63 +1,64 @@
 local usersettings = require('ShrugModules.usersettings')
-usersettings.Settings.Fly = {
+usersettings.set('Fly', {
 	RequiresTool = true,
 	Power = 1,
 	Tools = {
 		['plethora:neuralconnector'] = true
 	}
-}
+})
 
 local fly = {}
 fly.Enabled = false
 
----Returns a list of currently active fly tools.
 ---@return string[]
 function fly.getTools()
 	local tools = {}
 	
-	for tool, _ in pairs(usersettings.Settings.Fly.Tools) do
+	for tool, _ in pairs(usersettings.get('Fly/Tools')) do
 		table.insert(tools, tool)
 	end
 	
 	return tools
 end
 
----Adds a tool to the list of tools used to fly.
 ---@param toolName string
 function fly.addTool(toolName)
-	if usersettings.Settings.Fly.Tools[toolName] then
+	local settingPath = usersettings.path('Fly/Tools', toolName)
+	
+	if usersettings.get(settingPath) then
 		return string.format('Fly tool `%s` already exists.', toolName)
 	end
 	
-	usersettings.Settings.Fly.Tools[toolName] = true
+	usersettings.set(settingPath, true)
 	
 	return string.format('Successfully added fly tool `%s`.', toolName)
 end
 
----Removes a tool from the list of tools used to fly.
 ---@param toolName string
 function fly.removeTool(toolName)
-	if not usersettings.Settings.Fly.Tools[toolName] then
+	local settingPath = usersettings.path('Fly/Tools', toolName)
+	
+	if not usersettings.get(settingPath) then
 		return string.format('`%s` not found.', toolName)
 	end
 	
-	usersettings.Settings.Fly.Tools[toolName] = nil
+	usersettings.set(settingPath, nil)
 	
 	return string.format('Successfully removed fly tool `%s`.', toolName)
 end
 
----Clears the list of tools used to fly.
 function fly.clearTools()
-	usersettings.Settings.Fly.Tools = {
+	usersettings.set('Fly/Tools', {
 		['plethora:neuralconnector'] = true
-	}
+	})
 end
 
----Returns whether the passed tool is in the tools list.
 ---@param toolName string
 ---@return boolean isTool
 function fly.isTool(toolName)
-	return usersettings.Settings.Fly.Tools[toolName] ~= nil
+	local settingPath = usersettings.path('Fly/Tools', toolName)
+	
+	return usersettings.get(settingPath) ~= nil
 end
 
 return fly

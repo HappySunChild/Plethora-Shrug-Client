@@ -1,9 +1,9 @@
 local usersettings = require('ShrugModules.usersettings')
-usersettings.Settings.Client = {
+usersettings.set('Client', {
 	HostName = nil,
 	Username = nil,
 	Token = nil
-}
+})
 
 local client = {}
 client.SERVER_PROTOCOL = 'SHRUG_SERVER'
@@ -29,13 +29,13 @@ local function receive(taskid, timeout)
 end
 
 local function getServer(isRetry)
-	if usersettings.Settings.Client.HostName == nil or isRetry then
+	if usersettings.get('Client/HostName') == nil or isRetry then
 		write('Host Name: ')
 		
-		usersettings.Settings.Client.HostName = read()
+		usersettings.set('Client/HostName', read())
 	end
 	
-	local id = rednet.lookup(client.SERVER_PROTOCOL, usersettings.Settings.Client.HostName)
+	local id = rednet.lookup(client.SERVER_PROTOCOL, usersettings.get('Client/HostName'))
 	
 	if id then
 		print('Valid host name.')
@@ -53,7 +53,7 @@ end
 local function encode(data, id)
 	local encoded = {
 		TaskID = id,
-		Token = usersettings.get('Token'),
+		Token = usersettings.get('Client/Token'),
 		Body = data,
 	}
 	
@@ -75,14 +75,14 @@ function client.isTokenValid()
 end
 
 function client.login(isRetry)
-	if usersettings.get('Username') == nil or isRetry then
+	if usersettings.get('Client/Username') == nil or isRetry then
 		write('Enter Username: ')
 		
-		usersettings.set('Username', read())
+		usersettings.set('Client/Username', read())
 	end
 	
 	local loginData = {
-		Username = usersettings.get('Username')
+		Username = usersettings.get('Client/Username')
 	}
 	
 	local response = client.invoke('Login', loginData)
@@ -98,11 +98,7 @@ function client.login(isRetry)
 		
 		print(string.format('\nLogin success!\nToken: %d', token))
 		
-		usersettings.set('Token', token)
-	else
-		printError('Timed out.')
-		
-		return client.login(true)
+		usersettings.set('Client/Token', token)
 	end
 end
 

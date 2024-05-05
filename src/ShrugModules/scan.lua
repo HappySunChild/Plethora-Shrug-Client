@@ -1,12 +1,14 @@
 local usersettings = require('ShrugModules.usersettings')
-usersettings.Settings.Scan = {
+usersettings.set('Scan', {
 	DrawTracers = true,
 	
 	ScanInterval = 0.1,
 	
 	BoxAlpha = 100,
-	TracerAlpha = 100
-}
+	TracerAlpha = 100,
+	
+	SavedWhitelists = {}
+})
 
 local scan = {}
 scan.Enabled = false
@@ -26,6 +28,8 @@ local function getTagData(name)
 	
 	return nil
 end
+
+-----------------------------------------------------
 
 function scan.getWhitelist()
 	local list = {}
@@ -82,11 +86,11 @@ end
 ---@param name string
 ---@param alias? string
 ---@param color? string
-function scan.addWhitelist(canvas, name, alias, color)
+function scan.whitelistBlock(canvas, name, alias, color)
 	local blockName = string.match(name, '[^<]+')
 	local blockAlias = alias or blockName
 	
-	local blockColor = tonumber(tostring(color), 16) or 0xFF0000FF
+	local blockColor = tonumber(color) or 0xFF0000FF
 	
 	if scan.isWhitelisted(blockAlias) then
 		return string.format('Block `%s` is already in whitelist.', name)
@@ -118,7 +122,7 @@ function scan.addWhitelist(canvas, name, alias, color)
 end
 
 ---@param name string
-function scan.removeWhitelist(name)
+function scan.unwhitelistBlock(name)
 	local isWhitelisted, whitelistData = scan.isWhitelisted(name)
 	
 	if not isWhitelisted then
@@ -135,12 +139,70 @@ end
 
 function scan.clearWhitelist()
 	for index, _ in pairs(scan._whitelist) do
-		scan.removeWhitelist(index)
+		scan.unwhitelistBlock(index)
 	end
 end
 
+-----------------------------------------------------
+
+function scan.saveWhitelist(name)
+	local path = usersettings.path('Scan/SavedWhitelists', name)
+	
+	if usersettings.get(path) then
+		return ('Whitelist `%s` already exists.'):format(name)
+	end
+	
+	local serializedWhitelist = {}
+	
+	for _, data in pairs(scan._whitelist) do
+		local converted = {
+			Alias = data.Alias,
+			Color = data.Color,
+			Block = data.RawName,
+		}
+		
+		serializedWhitelist[data.Alias] = converted
+	end
+	
+	usersettings.set(path, serializedWhitelist)
+	
+	return ('Successfully saved whitelist `%s`.'):format(name)
+end
+
+function scan.loadWhitelist(canvas, name)
+	local path = usersettings.path('Scan/SavedWhitelists', name)
+	
+	if not usersettings.get(path) then
+		return ('Whitelist `%s` does not exist.'):format(name)
+	end
+	
+	scan.clearWhitelist()
+	
+	local whitelist = usersettings.get(path)
+	
+	for _, data in pairs(whitelist) do
+		scan.whitelistBlock(canvas, data.Block, data.Alias, data.Color)
+	end
+	
+	return ('Successfully loaded whitelist `%s`.'):format(name)
+end
+
+function scan.removeWhitelist(name)
+	local path = usersettings.path('Scan/SavedWhitelists', name)
+	
+	if not usersettings.get(path) then
+		return ('Whitelist `%s` does not exist.'):format(name)
+	end
+	
+	usersettings.set(path, nil)
+	
+	return ('Successfully removed whitelist `%s`.'):format(name)
+end
+
+-----------------------------------------------------
+
 function scan.canScan()
-	return (os.clock() - scan.LastScan) >= usersettings.Settings.Scan.ScanInterval
+	return (os.clock() - scan.LastScan) >= usersettings.get('Scan/ScanInterval')
 end
 
 function scan.resetCounts()
