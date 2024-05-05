@@ -6,7 +6,7 @@ You can download/update this by running<br/>
 - Kinetic Augment
 - Chat Recorder
 - Overlay Glasses
-- Entity Sensor/Correctly setup Shrug Proxy Server
+- Entity Sensor/Shrug Proxy Server
 
 ### Shrug Proxy Server
 This is an optional thing you can set up to free up one module slot.<br/>
