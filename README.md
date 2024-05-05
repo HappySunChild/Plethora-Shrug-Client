@@ -9,5 +9,5 @@ You can download/update this by running<br/>
 - Entity Sensor/Shrug Proxy Server
 
 ### Shrug Proxy Server
-This is an optional thing you can set up to free up one module slot.<br/>
+This is an optional thing you can set up to free up one module slot and also adds some more commands (.remote).<br/>
 ...
