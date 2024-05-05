@@ -114,7 +114,7 @@ function bounding.newMap()
 		newNode.Z = z
 		newNode.Visited = false
 		newNode.Data = data
-		newNode.Name = data.WhitelistData.Name
+		newNode.Name = data.WhitelistData.Alias
 		
 		map.Nodes[y] = self.Nodes[y] or {}
 		map.Nodes[y][x] = self.Nodes[y][x] or {}

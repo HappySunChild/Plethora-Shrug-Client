@@ -1,10 +1,5 @@
-local scan = {}
-scan.Modules = nil ---@type Shrug.NeuralInterface
-scan.Enabled = false
-scan.LastScan = 0
-
-scan.SettingsName = 'ScannerSettings'
-scan.Settings = {
+local usersettings = require('ShrugModules.usersettings')
+usersettings.Settings.Scan = {
 	DrawTracers = true,
 	
 	ScanInterval = 0.1,
@@ -13,13 +8,74 @@ scan.Settings = {
 	TracerAlpha = 100
 }
 
-scan.BlockWhitelist = {} ---@type WhitelistData[]
+local scan = {}
+scan.Enabled = false
+scan.LastScan = 0
 
-local function toBlockData(name)
-	local blockName = string.match(name, '[^<]+')
-	local tagName, tagValue = string.match(name, '<([^=]+)=(.-)>')
+scan._whitelist = {} ---@type table<string, WhitelistData>
+
+local function getTagData(name)
+	local tagName, tagValue = string.match(name, '<([^=:]+)[=:](.-)>')
 	
-	return {state = {[tostring(tagName)] = tagValue}, name = blockName}
+	if tagName and tagValue then
+		return {
+			Name = tagName,
+			Value = tagValue
+		}
+	end
+	
+	return nil
+end
+
+function scan.getWhitelist()
+	local list = {}
+	
+	for _, data in pairs(scan._whitelist) do
+		table.insert(list, data)
+	end
+	
+	return list
+end
+
+function scan.isWhitelisted(name)
+	local data = scan._whitelist[name]
+	
+	if not data then
+		for _, whitelistData in pairs(scan._whitelist) do
+			if whitelistData.Name == name then
+				data = whitelistData
+				
+				break
+			end
+		end
+	end
+	
+	return data ~= nil, data
+end
+
+---@param blockData BlockScanner.BlockData
+function scan.isBlockWhitelisted(blockData)
+	local data = nil
+	
+	for _, whitelistData in pairs(scan._whitelist) do
+		if blockData.name == whitelistData.Name then
+			local tagData = whitelistData.Tag
+			
+			if not tagData then
+				data = whitelistData
+				
+				break
+			end
+			
+			if tostring(blockData.state[tagData.Name]):lower() == tagData.Value:lower() then
+				data = whitelistData
+				
+				break
+			end
+		end
+	end
+	
+	return data ~= nil, data
 end
 
 ---@param canvas OverlayGlasses.Canvas2d
@@ -27,24 +83,16 @@ end
 ---@param alias? string
 ---@param color? string
 function scan.addWhitelist(canvas, name, alias, color)
-	if scan.isWhitelisted(toBlockData(name)) then
+	local blockName = string.match(name, '[^<]+')
+	local blockAlias = alias or blockName
+	
+	local blockColor = tonumber(tostring(color), 16) or 0xFF0000FF
+	
+	if scan.isWhitelisted(blockAlias) then
 		return string.format('Block `%s` is already in whitelist.', name)
 	end
 	
-	local blockName = string.match(name, '[^<]+')
-	local tagName, tagValue = string.match(name, '<([^=]+)=(.-)>')
-	
-	local tagData = nil
-	
-	if tagName and tagValue then
-		tagData = {
-			Name = tagName,
-			Value = tagValue
-		}
-	end
-	
-	local blockAlias = alias or blockName
-	local blockColor = tonumber(tostring(color), 16) or 0xFF0000FF
+	local tagData = getTagData(name)
 	
 	local label = canvas.addText({x=0,y=0}, '')
 	label.setColor(blockColor)
@@ -52,8 +100,8 @@ function scan.addWhitelist(canvas, name, alias, color)
 	label.setScale(0.6)
 	
 	local whitelistData = {
-		Name = name,
-		BlockName = blockName,
+		RawName = name,
+		Name = blockName,
 		Alias = blockAlias,
 		Color = blockColor,
 		
@@ -63,7 +111,7 @@ function scan.addWhitelist(canvas, name, alias, color)
 		Label = label,
 	}
 	
-	table.insert(scan.BlockWhitelist, whitelistData)
+	scan._whitelist[blockAlias] = whitelistData
 	scan.updateLabels()
 	
 	return string.format('Successfully added `%s` to whitelist.', name)
@@ -71,14 +119,14 @@ end
 
 ---@param name string
 function scan.removeWhitelist(name)
-	local isWhitelisted, whitelistData, index = scan.isWhitelisted(toBlockData(name))
+	local isWhitelisted, whitelistData = scan.isWhitelisted(name)
 	
-	if not isWhitelisted or not whitelistData or not index then
+	if not isWhitelisted then
 		return string.format('`%s` not found.', name)
 	end
 	
 	whitelistData.Label.remove()
-	table.remove(scan.BlockWhitelist, index)
+	scan._whitelist[name] = nil
 	
 	scan.updateLabels()
 	
@@ -86,53 +134,29 @@ function scan.removeWhitelist(name)
 end
 
 function scan.clearWhitelist()
-	while next(scan.BlockWhitelist) do
-		local data = scan.BlockWhitelist[1]
-		
-		scan.removeWhitelist(data.Name)
+	for index, _ in pairs(scan._whitelist) do
+		scan.removeWhitelist(index)
 	end
-end
-
----@param blockData BlockScanner.BlockData
----@return boolean whitelisted
----@return WhitelistData? data
----@return integer? index
-function scan.isWhitelisted(blockData)
-	for index, whitelistData in ipairs(scan.BlockWhitelist) do
-		if whitelistData.BlockName == blockData.name then
-			local tagData = whitelistData.Tag
-			
-			if tagData then
-				if tostring(blockData.state[tagData.Name]):lower() == tagData.Value:lower() then
-					return true, whitelistData, index
-				end
-			else
-				return true, whitelistData, index
-			end
-		end
-	end
-	
-	return false
 end
 
 function scan.canScan()
-	return (os.clock() - scan.LastScan) >= scan.Settings.ScanInterval
+	return (os.clock() - scan.LastScan) >= usersettings.Settings.Scan.ScanInterval
 end
 
 function scan.resetCounts()
-	for _, target in pairs(scan.BlockWhitelist) do
+	for _, target in pairs(scan._whitelist) do
 		target.Count = 0
 	end
 end
 
 function scan.updateLabels()
-	for i, target in ipairs(scan.BlockWhitelist) do
-		target.Label.setPosition(0, (i - 1) * 6)
+	for i, data in ipairs(scan.getWhitelist()) do
+		data.Label.setPosition(1, 1 + (i - 1) * 6)
 		
 		if scan.Enabled then
-			target.Label.setText(string.format('%s: %d', target.Alias, target.Count))
+			data.Label.setText(string.format('%s: %d', data.Alias, data.Count))
 		else
-			target.Label.setText('') -- clear text
+			data.Label.setText('') -- clear text
 		end
 	end
 end

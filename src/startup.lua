@@ -1,28 +1,20 @@
-local button = require('ShrugModules.button')
 local bounding = require('ShrugModules.bounding')
+local usersettings = require('ShrugModules.usersettings')
 
 local scan = require('ShrugModules.scan')
 local fly = require('ShrugModules.fly')
+local client = require('ShrugModules.client')
 
 local modules = peripheral.find('neuralInterface') --- @type Shrug.NeuralInterface
 
 modules.canvas3d().clear()
 modules.canvas().clear()
 
-local canvas = modules.canvas()
-local canvas3d = modules.canvas3d().create()
-
-local SETTINGS_PATH = '.shrug_settings'
+local CANVAS = modules.canvas()
+local SCANNER_CANVAS = modules.canvas3d().create()
 
 local PLAYER_METADATA = nil --- @type EntitySensor.EntityMetadata
 local PLAYER_ID = nil
-
-local function saveSettings()
-	settings.set(scan.SettingsName, scan.Settings)
-	settings.set(fly.SettingsName, fly.Settings)
-	
-	settings.save(SETTINGS_PATH)
-end
 
 ---@type table<string, table<string, Shrug.Command>>
 local CHAT_COMMANDS = {
@@ -33,6 +25,9 @@ local CHAT_COMMANDS = {
 			Callback = function ()
 				scan.Enabled = not scan.Enabled
 				
+				SCANNER_CANVAS.clear()
+				scan.updateLabels()
+				
 				return string.format('Scanner %s.', scan.Enabled and 'enabled' or 'disabled')
 			end
 		},
@@ -41,7 +36,7 @@ local CHAT_COMMANDS = {
 			Arguments = '',
 			Callback = function ()
 				local output = 'Current blocks:\n'
-				local whitelist = scan.BlockWhitelist
+				local whitelist = scan.getWhitelist()
 				
 				for _, data in ipairs(whitelist) do
 					output = output .. string.format('%s (%s)\n', data.Name, data.Alias)
@@ -56,7 +51,7 @@ local CHAT_COMMANDS = {
 			DisplayOrder = 3,
 			Arguments = '<block name> [alias] [color hex]',
 			Callback = function (name, alias, color)
-				return scan.addWhitelist(canvas, name, alias, color)
+				return scan.addWhitelist(CANVAS, name, alias, color)
 			end
 		},
 		remove = {
@@ -82,9 +77,11 @@ local CHAT_COMMANDS = {
 				local alpha = tonumber(alpha) or 100
 				
 				if mode == 'tracers' then
-					scan.Settings.TracerAlpha = alpha
+					usersettings.set('TracerAlpha', alpha)
+					--scan.Settings.TracerAlpha = alpha
 				elseif mode == 'boxes' then
-					scan.Settings.BoxAlpha = alpha
+					usersettings.set('BoxAlpha', alpha)
+					--scan.Settings.BoxAlpha = alpha
 				else
 					return 'Invalid tracer type.'
 				end
@@ -98,7 +95,8 @@ local CHAT_COMMANDS = {
 			Callback = function (interval)
 				local time = tonumber(interval) or 0.2
 				
-				scan.Settings.ScanInterval = time
+				--scan.Settings.ScanInterval = time
+				usersettings.set('ScanInterval', time)
 				
 				return string.format('Scan interval is now %.2f.', time)
 			end
@@ -121,14 +119,15 @@ local CHAT_COMMANDS = {
 				power = tonumber(power)
 				
 				if not power then
-					return string.format('Current fly power is %.2f', fly.Settings.Power)
+					return string.format('Current fly power is %.2f', usersettings.get('Power'))
 				end
 				
 				if power < 0 or power > 4 then
 					return string.format('Inputted power `%.2f` is out of range! (0-4)', power)
 				end
 				
-				fly.Settings.Power = power
+				--fly.Settings.Power = power
+				usersettings.set('Power', power)
 				
 				return string.format('Fly power is now %.2f', power)
 			end
@@ -191,9 +190,10 @@ local CHAT_COMMANDS = {
 			DisplayOrder = 9,
 			Arguments = '',
 			Callback = function ()
-				fly.Settings.RequiresTool = not fly.Settings.RequiresTool
+				local newValue = not usersettings.get('RequiresTool')
+				usersettings.set('RequiresTool', newValue)
 				
-				return fly.Settings.RequiresTool and 'Tools are now required to fly.' or 'Tools are no longer required to fly.'
+				return newValue and 'Tools are now required to fly.' or 'Tools are no longer required to fly.'
 			end
 		}
 	},
@@ -202,7 +202,7 @@ local CHAT_COMMANDS = {
 			Arguments = '',
 			DisplayOrder = 1,
 			Callback = function ()
-				saveSettings()
+				usersettings.save()
 				
 				return 'Successfully saved settings.'
 			end
@@ -234,6 +234,10 @@ local function getCarrierID()
 end
 
 local function getCarrierMetadata()
+	if client.SERVER_ID and not modules.hasModule('plethora:sensor') then
+		return client.getMetadata()
+	end
+	
 	if not PLAYER_ID then
 		PLAYER_ID = getCarrierID()
 	end
@@ -242,11 +246,6 @@ local function getCarrierMetadata()
 end
 
 local function setup()
-	scan.Modules = modules
-	fly.Modules = modules
-	
-	PLAYER_METADATA = getCarrierMetadata()
-	
 	for handlerName, container in pairs(CHAT_COMMANDS) do
 		modules.capture(string.format('%%.(%s)', handlerName))
 		
@@ -284,16 +283,11 @@ local function setup()
 	term.clear()
 	term.setCursorPos(1, 1)
 	
-	local success = settings.load(SETTINGS_PATH)
+	usersettings.load()
 	
-	if not success then
-		modules.tell(string.format('Creating save file at `%s`.', SETTINGS_PATH))
-		
-		saveSettings()
-	else
-		scan.Settings = settings.get(scan.SettingsName, scan.Settings)
-		fly.Settings = settings.get(fly.SettingsName, fly.Settings)
-	end
+	client.setup()
+	
+	PLAYER_METADATA = getCarrierMetadata()
 end
 
 -------------------------------------
@@ -342,17 +336,14 @@ local function eventHandler()
 			end
 		elseif event == 'terminate' then
 			modules.clearCaptures()
-			canvas.clear()
-			canvas3d.clear()
+			CANVAS.clear()
+			SCANNER_CANVAS.clear()
 			
-			saveSettings()
+			usersettings.save()
 			
 			modules.tell('Terminating...')
 			
 			return
-		elseif event == 'mouse_click' then
-			button.click(eventData[3], eventData[4])
-			button.draw()
 		end
 	end
 end
@@ -360,17 +351,15 @@ end
 local function main()
 	modules.tell('Shrug Client started!')
 	
-	local dbgText = canvas.addText({x=1,y=1}, '', 0xFF0000FF, 0.6)
-	dbgText.setShadow(true)
-	
 	while true do
 		local heldItem = PLAYER_METADATA.heldItem
 		local offhandItem = PLAYER_METADATA.offhandItem
 		
 		if fly.Enabled and PLAYER_METADATA.isSneaking then
 			local hasTool = false
+			local requiresTool = usersettings.get('RequiresTool')
 			
-			if fly.Settings.RequiresTool then
+			if requiresTool then
 				if heldItem then
 					hasTool = fly.isTool(heldItem.getMetadata().name) or hasTool
 				end
@@ -380,8 +369,8 @@ local function main()
 				end
 			end
 			
-			if hasTool or not fly.Settings.RequiresTool then
-				modules.launch(PLAYER_METADATA.yaw, PLAYER_METADATA.pitch, fly.Settings.Power)
+			if hasTool or not requiresTool then
+				modules.launch(PLAYER_METADATA.yaw, PLAYER_METADATA.pitch, usersettings.get('Power'))
 			end
 		end
 		
@@ -392,7 +381,7 @@ local function main()
 			local found = {}
 			
 			for _, block in ipairs(scanned) do
-				local whitelisted, data = scan.isWhitelisted(block)
+				local whitelisted, data = scan.isBlockWhitelisted(block)
 				
 				if whitelisted and data then
 					data.Count = data.Count + 1
@@ -409,8 +398,8 @@ local function main()
 			local within = PLAYER_METADATA.withinBlock
 			local meshed = bounding.mesh(found)
 			
-			canvas3d.recenter()
-			canvas3d.clear()
+			SCANNER_CANVAS.recenter()
+			SCANNER_CANVAS.clear()
 			
 			for _, data in ipairs(meshed) do
 				local position = {
@@ -425,19 +414,19 @@ local function main()
 					z = position.z + data.SizeZ / 2
 				}
 				
-				local box = canvas3d.addBox(position.x, position.y, position.z, data.SizeX, data.SizeY, data.SizeZ, data.Color)
+				local box = SCANNER_CANVAS.addBox(position.x, position.y, position.z, data.SizeX, data.SizeY, data.SizeZ, data.Color)
 				box.setDepthTested(false)
-				box.setAlpha(scan.Settings.BoxAlpha)
+				box.setAlpha(usersettings.get('BoxAlpha'))
 				
-				local frame = canvas3d.addFrame(center)
+				local frame = SCANNER_CANVAS.addFrame(center)
 				frame.setDepthTested(false)
 				frame.setRotation()
-				frame.addText({x=0, y=0}, string.format('%s\n(%d)', data.Alias, data.Count), nil, 1.5)
+				frame.addText({x=0, y=0}, string.format('%s\n(%d)', data.Alias, data.Count), nil, 1.6)
 				
-				if scan.Settings.DrawTracers then
-					local line = canvas3d.addLine({x = 0, y = -1, z = 0}, center, 2, data.Color)
+				if usersettings.get('DrawTracers') then
+					local line = SCANNER_CANVAS.addLine({x = 0, y = -1, z = 0}, center, 2, data.Color)
 					line.setDepthTested(false)
-					line.setAlpha(scan.Settings.TracerAlpha)
+					line.setAlpha(usersettings.get('TracerAlpha'))
 				end
 			end
 			
