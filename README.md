@@ -25,4 +25,5 @@ There are currently *6* different command handlers available, they are:
 - `.killaura` (Requires Frickin' Laser Beam)
 - `.remote` (Requires Shrug Proxy Server)
 - `.settings`
+
 Typing any of these into chat will give a list of commands you can run with them, assuming you have the module they require.
