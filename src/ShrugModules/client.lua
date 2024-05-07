@@ -9,8 +9,6 @@ local client = {}
 client.SERVER_PROTOCOL = 'SHRUG_SERVER'
 client.SERVER_ID = nil
 
-client.LastMetadataPing = -1
-
 ---@param taskid number
 ---@param timeout? number
 ---@return ServerResponse
@@ -38,7 +36,7 @@ local function getServer(isRetry)
 	local id = rednet.lookup(client.SERVER_PROTOCOL, usersettings.get('Client/HostName'))
 	
 	if id then
-		print('Valid host name.')
+		print(('Valid host name.\nServer ID: %d'):format(id))
 		
 		return id
 	end
@@ -96,27 +94,10 @@ function client.login(isRetry)
 		
 		local token = response.Body.Token
 		
-		print(string.format('\nLogin success!\nToken: %d', token))
+		print(string.format('\n%s\nToken: %d', response.Message, token))
 		
 		usersettings.set('Client/Token', token)
 	end
-end
-
----@return EntitySensor.EntityMetadata?
-function client.getMetadata()
-	if (os.clock() - client.LastMetadataPing) <= 0.2 then
-		return
-	end
-	
-	client.LastMetadataPing = os.clock()
-	
-	local response = client.invoke('GetMetadata')
-	
-	if response.Success then
-		return response.Body.Metadata
-	end
-	
-	printError(response.Message)
 end
 
 ---@return table<number, Inventory.ItemMetadata>?
