@@ -15,8 +15,15 @@ local files = {
 	
 	'ShrugModules/client.lua',
 	'ShrugModules/scan.lua',
+	'ShrugModules/laser.lua',
 	'ShrugModules/fly.lua',
 }
+
+if fs.exists('.shrugsettings') then
+	print('Removing save file.')
+	
+	fs.delete('.shrugsettings')
+end
 
 for _, path in ipairs(files) do
 	if fs.exists(path) then
