@@ -666,4 +666,4 @@ end
 
 setup()
 
-parallel.waitForAny(eventHandler, laserHandler, updateMetadata, main)
+parallel.waitForAll(eventHandler, laserHandler, updateMetadata, main)
