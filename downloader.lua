@@ -11,7 +11,7 @@ local files = {
 	'startup.lua',
 	
 	'ShrugModules/usersettings.lua',
-	'ShrugModules/bounding.lua',
+	'ShrugModules/meshing.lua',
 	
 	'ShrugModules/client.lua',
 	'ShrugModules/scan.lua',
