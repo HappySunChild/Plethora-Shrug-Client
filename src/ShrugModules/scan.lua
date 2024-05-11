@@ -1,6 +1,8 @@
 local usersettings = require('ShrugModules.usersettings')
 usersettings.set('Scan', {
+	DrawBoxes = true,
 	DrawTracers = true,
+	DrawLabels = true,
 	
 	ScanInterval = 0.1,
 	
@@ -103,6 +105,7 @@ function scan.whitelistBlock(canvas, name, alias, color)
 	label.setShadow(true)
 	label.setScale(0.6)
 	
+	---@type WhitelistData
 	local whitelistData = {
 		RawName = name,
 		Name = blockName,

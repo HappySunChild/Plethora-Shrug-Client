@@ -1,4 +1,4 @@
-local bounding = require('ShrugModules.bounding')
+local meshing = require('ShrugModules.meshing')
 local usersettings = require('ShrugModules.usersettings')
 
 local laser = require('ShrugModules.laser')
@@ -105,7 +105,7 @@ local CHAT_COMMANDS = {
 			},
 			setalpha = {
 				DisplayOrder = 20,
-				Arguments = '<tracers|boxes> <alpha>',
+				Arguments = '<boxes|tracers> <alpha>',
 				Callback = function (mode, alpha)
 					local alpha = tonumber(alpha) or 100
 					
@@ -131,6 +131,31 @@ local CHAT_COMMANDS = {
 					return ('Scan interval is now %.2f.'):format(time)
 				end
 			},
+			setdrawing = {
+				DisplayOrder = 22,
+				Arguments = '<boxes|tracers|labels> [state]',
+				Callback = function (name, state)
+					local path = nil
+					
+					if name == 'boxes' then
+						path = 'Scan/DrawBoxes'
+					elseif name == 'tracers' then
+						path = 'Scan/DrawTracers'
+					elseif name == 'labels' then
+						path = 'Scan/DrawLabels'
+					end
+					
+					if path then
+						local newState = state and state == 'true' or not usersettings.get(path)
+						
+						usersettings.set(path, newState)
+						
+						return ('%s are now %s.'):format(name, newState and 'enabled' or 'disabled')
+					end
+					
+					return 'Invalid target.'
+				end
+			}
 		}
 	},
 	laser = {
@@ -448,8 +473,10 @@ end
 
 -------------------------------------
 
-local function main()
-	modules.tell('Shrug Client started!')
+local function flyHandler()
+	if not modules.hasModule('plethora:kinetic') then
+		return
+	end
 	
 	while true do
 		local heldItem = PLAYER_METADATA.heldItem
@@ -473,7 +500,15 @@ local function main()
 				modules.launch(PLAYER_METADATA.yaw, PLAYER_METADATA.pitch, usersettings.get('Fly/Power'))
 			end
 		end
-		
+	end
+end
+
+local function scanHandler()
+	if not modules.hasModule('plethora:scanner') then
+		return
+	end
+	
+	while true do
 		if scan.Enabled and scan.canScan() then
 			scan.LastScan = os.clock()
 			
@@ -490,16 +525,24 @@ local function main()
 						X = block.x,
 						Y = block.y,
 						Z = block.z,
+						MetaState = block.metadata,
 						WhitelistData = data
 					})
 				end
 			end
 			
-			local within = PLAYER_METADATA.withinBlock
-			local meshed = bounding.mesh(found)
+			local meshed = meshing.doMeshing('bounding', found)
 			
 			SCANNER_CANVAS.recenter()
 			SCANNER_CANVAS.clear()
+			
+			local within = PLAYER_METADATA.withinBlock
+			local boxAlpha = usersettings.get('Scan/BoxAlpha')
+			local tracerAlpha = usersettings.get('Scan/TracerAlpha')
+			
+			local drawBoxes = usersettings.get('Scan/DrawBoxes')
+			local drawTracers = usersettings.get('Scan/DrawTracers')
+			local drawLabels = usersettings.get('Scan/DrawLabels')
 			
 			for _, data in ipairs(meshed) do
 				local position = {
@@ -514,36 +557,35 @@ local function main()
 					z = position.z + data.SizeZ / 2
 				}
 				
-				local box = SCANNER_CANVAS.addBox(position.x, position.y, position.z, data.SizeX, data.SizeY, data.SizeZ, data.Color)
-				box.setDepthTested(false)
-				box.setAlpha(usersettings.get('Scan/BoxAlpha'))
+				if drawBoxes then
+					local box = SCANNER_CANVAS.addBox(position.x, position.y, position.z, data.SizeX, data.SizeY, data.SizeZ, data.Color)
+					box.setDepthTested(false)
+					box.setAlpha(boxAlpha)
+				end
 				
-				local frame = SCANNER_CANVAS.addFrame(center)
-				frame.setDepthTested(false)
-				frame.setRotation()
-				frame.addText({x=0, y=0}, ('%s\n(%d)'):format(data.Alias, data.Count), nil, 1.6)
+				if data.Label and drawLabels then
+					local whitelistData = data.WhitelistData
+					
+					local frame = SCANNER_CANVAS.addFrame(center)
+					frame.setDepthTested(false)
+					frame.setRotation()
+					
+					local item = frame.addItem({x=0,y=0}, whitelistData.Name, whitelistData.Tag and data.MetaState)
+					item.setScale(2)
+					
+					local text = frame.addText({x=0, y=30}, data.Label, nil, 1)
+					text.setShadow(true)
+				end
 				
-				if usersettings.get('Scan/DrawTracers') then
+				if drawTracers then
 					local line = SCANNER_CANVAS.addLine({x = 0, y = -1, z = 0}, center, 2, data.Color)
 					line.setDepthTested(false)
-					line.setAlpha(usersettings.get('Scan/TracerAlpha'))
+					line.setAlpha(tracerAlpha)
 				end
 			end
 			
 			scan.updateLabels()
 			scan.resetCounts()
-		end
-		
-		sleep()
-	end
-end
-
-local function updateMetadata()
-	while true do
-		local data = getCarrierMetadata()
-		
-		if data ~= nil then
-			PLAYER_METADATA = data
 		end
 		
 		sleep()
@@ -565,7 +607,9 @@ local function laserHandler()
 					if not healthCache[entity.name] then
 						local metadata = modules.getMetaByID(entity.id)
 						
-						healthCache[entity.name] = metadata.maxHealth
+						if metadata then
+							healthCache[entity.name] = metadata.maxHealth
+						end
 					end
 					
 					table.insert(candidates, entity)
@@ -601,6 +645,20 @@ local function laserHandler()
 					modules.fire(yaw, pitch, potency)
 				end
 			end
+		end
+		
+		sleep()
+	end
+end
+
+-------------------------------------
+
+local function updateMetadata()
+	while true do
+		local data = getCarrierMetadata()
+		
+		if data ~= nil then
+			PLAYER_METADATA = data
 		end
 		
 		sleep()
@@ -664,6 +722,16 @@ local function eventHandler()
 	end
 end
 
+local function autosave()
+	while true do
+		sleep(600)
+		
+		modules.tell('Autosaving settings.')
+		
+		usersettings.save()
+	end
+end
+
 setup()
 
-parallel.waitForAll(eventHandler, laserHandler, updateMetadata, main)
+parallel.waitForAll(flyHandler, scanHandler, laserHandler, eventHandler, updateMetadata, autosave)
