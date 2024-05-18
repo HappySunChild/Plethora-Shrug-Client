@@ -62,7 +62,7 @@ local function recurse(tbl, callback)
 end
 
 local function newToken()
-	local token = math.random(0, 9e6)
+	local token = math.random(0, 0xFFFFF)
 	
 	if USER_MODULES.InUse[token] then
 		return newToken()
@@ -107,7 +107,7 @@ local PROTOCOLS = {
 		}
 	end,
 	
-	Drop = function (request)
+	Dump = function (request)
 		local userModule, message = getModuleFromToken(request.Token)
 		
 		if not userModule then
@@ -126,19 +126,6 @@ local PROTOCOLS = {
 		
 		return true, 'Success'
 	end,
-	Suck = function (request)
-		local userModule, message = getModuleFromToken(request.Token)
-		
-		if not userModule then
-			return false, message
-		end
-		
-		local inventory = userModule.Manipulator.getInventory()
-		
-		print(inventory.suck())
-		
-		return true, 'Success'
-	end,
 	Give = function (request)
 		local userModule, message = getModuleFromToken(request.Token)
 		
@@ -152,11 +139,19 @@ local PROTOCOLS = {
 			return false, 'User does not exist.'
 		end
 		
+		local bottom = peripheral.wrap('bottom') ---@type Inventory
+		
+		if not bottom then
+			return false, 'Missing inventory peripheral on `bottom`!'
+		end
+		
+		local size = bottom.size()
+		
 		local equipment = userModule.Manipulator.getEquipment()
 		local inventory = targetModule.Manipulator.getInventory()
 		
-		equipment.pushItems('bottom', 1)
-		inventory.pullItems('bottom', 1)
+		equipment.pushItems('bottom', 1, nil, size)
+		inventory.pullItems('bottom', size)
 		
 		return true, 'Success'
 	end,
@@ -194,6 +189,31 @@ local function log(...)
 	term.setCursorPos(x, y)
 end
 
+local function addUserModule(manipulator)
+	local side = peripheral.getName(manipulator)
+	
+	if not manipulator.getName then
+		log(('UserModule on side `%s` is missing introspection module!'):format(side))
+		
+		return
+	end
+	
+	local name = manipulator.getName()
+	
+	---@type UserModule
+	local UserModule = {
+		Username = name,
+		Side = side,
+		
+		Manipulator = manipulator,
+		Settings = {}
+	}
+	
+	USER_MODULES.Available[name] = UserModule
+	
+	log(('UserModule for `%s` detected on %s.'):format(name, side))
+end
+
 local function setup()
 	term.clear()
 	term.setCursorPos(1, 1)
@@ -209,21 +229,7 @@ local function setup()
 	local found = {peripheral.find('manipulator')} ---@type (Peripheral.Manipulator | Modules.IntroSensor)[]
 	
 	for _, manipulator in ipairs(found) do
-		local name = manipulator.getName()
-		local side = peripheral.getName(manipulator)
-		
-		---@type UserModule
-		local UserModule = {
-			Username = name,
-			Side = side,
-			
-			Manipulator = manipulator,
-			Settings = {}
-		}
-		
-		USER_MODULES.Available[name] = UserModule
-		
-		log(('UserModule for `%s` detected on %s.'):format(name, side))
+		addUserModule(manipulator)
 	end
 end
 
@@ -272,6 +278,17 @@ local function timerHandler()
 	end
 end
 
+local function peripheralListener()
+	while true do
+		local _, side = os.pullEvent('peripheral')
+		local newPeripheral = peripheral.wrap(side)
+		
+		if peripheral.getType(newPeripheral) == 'manipulator' then
+			addUserModule(newPeripheral)
+		end
+	end
+end
+
 setup()
 
-parallel.waitForAll(rednetHandler, timerHandler)
+parallel.waitForAll(rednetHandler, timerHandler, peripheralListener)

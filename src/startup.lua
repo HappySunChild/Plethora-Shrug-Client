@@ -329,13 +329,13 @@ local CHAT_COMMANDS = {
 			return client.SERVER_ID ~= nil, 'Server is not set up!'
 		end,
 		Commands = {
-			drop = {
+			dump = {
 				Arguments = '',
 				DisplayOrder = 1,
 				Callback = function ()
-					modules.tell('Requesting drop...')
+					modules.tell('Requesting dump...')
 					
-					return client.invoke('Drop').Message
+					return client.invoke('Dump').Message
 				end
 			},
 			suck = {
@@ -500,6 +500,8 @@ local function flyHandler()
 				modules.launch(PLAYER_METADATA.yaw, PLAYER_METADATA.pitch, usersettings.get('Fly/Power'))
 			end
 		end
+		
+		sleep()
 	end
 end
 
@@ -616,6 +618,10 @@ local function laserHandler()
 				end
 			end
 			
+			table.sort(candidates, function (x, y)
+				return healthCache[x.name] > healthCache[y.name]
+			end)
+			
 			for _, entity in ipairs(candidates) do
 				local calculatedPotency = math.min(math.max(healthCache[entity.name] / 40, 0.5), 5)
 				local x, y, z = entity.x, entity.y, entity.z
@@ -725,8 +731,6 @@ end
 local function autosave()
 	while true do
 		sleep(600)
-		
-		modules.tell('Autosaving settings.')
 		
 		usersettings.save()
 	end

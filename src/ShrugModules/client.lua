@@ -58,12 +58,12 @@ local function encode(data, id)
 	return encoded
 end
 
-function client.invoke(protocol, data)
-	local taskId = math.random(0, 9e6)
+function client.invoke(protocol, data, timeout)
+	local taskId = math.random(0, 0xFFFFFF)
 	
 	rednet.send(client.SERVER_ID, encode(data, taskId), protocol)
 	
-	return receive(taskId, 8)
+	return receive(taskId, tonumber(timeout) or 8)
 end
 
 function client.isTokenValid()
